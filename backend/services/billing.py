@@ -1,9 +1,3 @@
-"""
-Stripe Billing API implementation for Suna on top of Basejump. ONLY HAS SUPPOT FOR USER ACCOUNTS – no team accounts. As we are using the user_id as account_id as is the case with personal accounts. In personal accounts, the account_id equals the user_id. In team accounts, the account_id is unique.
-
-stripe listen --forward-to localhost:8000/api/billing/webhook
-"""
-
 from fastapi import APIRouter, HTTPException, Depends, Request
 from typing import Optional, Dict, Tuple
 import stripe
@@ -291,26 +285,11 @@ async def check_billing_status(client, user_id: str) -> Tuple[bool, str, Optiona
     return True, "OK", subscription
 
 # API endpoints
-
 @router.post("/create-checkout-session")
 async def create_checkout_session(
     request: CreateCheckoutSessionRequest,
     current_user_id: str = Depends(get_current_user_id_from_jwt)
 ):
-    if BILLING_DISABLED:
-        return {
-            "subscription_id": "fake-sub-id",
-            "status": "updated",
-            "message": "Billing disabled, all features enabled",
-            "details": {
-                "is_upgrade": True,
-                "effective_date": "immediate",
-                "current_price": 0,
-                "new_price": 0,
-                "invoice": None
-            }
-        }
-
     """Create a Stripe Checkout session or modify an existing subscription."""
     try:
         # Get Supabase client
@@ -595,8 +574,6 @@ async def create_portal_session(
     request: CreatePortalSessionRequest,
     current_user_id: str = Depends(get_current_user_id_from_jwt)
 ):
-    if BILLING_DISABLED:
-        return {"url": "https://your-site-url/portal-fake"}
     """Create a Stripe Customer Portal session for subscription management."""
     try:
         # Get Supabase client
@@ -697,15 +674,6 @@ async def create_portal_session(
 async def get_subscription(
     current_user_id: str = Depends(get_current_user_id_from_jwt)
 ):
-    if BILLING_DISABLED:
-        return {
-            "status": "active",
-            "plan_name": "pro",
-            "price_id": "fake",
-            "minutes_limit": 999999,
-            "current_usage": 0,
-            "has_schedule": False,
-        }
     """Get the current subscription status for the current user, including scheduled changes."""
     try:
         # Get subscription from Stripe (this helper already handles filtering/cleanup)
@@ -789,16 +757,6 @@ async def get_subscription(
 async def check_status(
     current_user_id: str = Depends(get_current_user_id_from_jwt)
 ):
-    if BILLING_DISABLED:
-        return {
-            "can_run": True,
-            "message": "Billing disabled, unlimited usage",
-            "subscription": {
-                "plan_name": "pro",
-                "minutes_limit": 999999,
-                "current_usage": 0,
-            }
-        }
     """Check if the user can run agents based on their subscription and usage."""
     try:
         # Get Supabase client
@@ -819,8 +777,6 @@ async def check_status(
 
 @router.post("/webhook")
 async def stripe_webhook(request: Request):
-    if BILLING_DISABLED:
-        return {"status": "success"}
     """Handle Stripe webhook events."""
     try:
         # Get the webhook secret from config
@@ -904,22 +860,6 @@ async def stripe_webhook(request: Request):
 async def get_available_models(
     current_user_id: str = Depends(get_current_user_id_from_jwt)
 ):
-    if BILLING_DISABLED:
-        # Вернём все модели, как будто у юзера PRO
-        model_info = []
-        for short_name, full_name in MODEL_NAME_ALIASES.items():
-            model_info.append({
-                "id": full_name,
-                "display_name": short_name,
-                "short_name": short_name,
-                "requires_subscription": False,
-                "is_available": True
-            })
-        return {
-            "models": model_info,
-            "subscription_tier": "pro",
-            "total_models": len(model_info)
-        }
     """Get the list of models available to the user based on their subscription tier."""
     try:
         # Get Supabase client
