@@ -3,7 +3,11 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 
-export async function signIn(prevState: any, formData: FormData) {
+// Функция входа пользователя
+export async function signIn(
+  _prevState: any,
+  formData: FormData
+) {
   const email = formData.get('email') as string;
   const password = formData.get('password') as string;
   const returnUrl = formData.get('returnUrl') as string | undefined;
@@ -17,22 +21,21 @@ export async function signIn(prevState: any, formData: FormData) {
   }
 
   const supabase = await createClient();
-
-  const { error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
     return { message: error.message || 'Could not authenticate user' };
   }
 
-  // Use client-side navigation instead of server-side redirect
+  // Успешный вход, возвращаем редирект
   return { success: true, redirectTo: returnUrl || '/dashboard' };
 }
 
-export async function signUp(prevState: any, formData: FormData) {
-  const origin = formData.get('origin') as string;
+// Функция регистрации пользователя с автоподтверждением
+export async function signUp(
+  _prevState: any,
+  formData: FormData
+) {
   const email = formData.get('email') as string;
   const password = formData.get('password') as string;
   const confirmPassword = formData.get('confirmPassword') as string;
@@ -41,37 +44,31 @@ export async function signUp(prevState: any, formData: FormData) {
   if (!email || !email.includes('@')) {
     return { message: 'Please enter a valid email address' };
   }
-
   if (!password || password.length < 6) {
     return { message: 'Password must be at least 6 characters' };
   }
-
   if (password !== confirmPassword) {
     return { message: 'Passwords do not match' };
   }
 
   const supabase = await createClient();
-
-const { error } = await supabase.auth.signUp({
+  // Без options.emailRedirectTo — не отправляем письмо
+  const { data, error } = await supabase.auth.signUp({ email, password });
 
   if (error) {
     return { message: error.message || 'Could not create account' };
   }
 
-  // Try to sign in immediately
-
-  if (signInError) {
-    return {
-      message:
-        'Account created! Check your email to confirm your registration.',
-    };
-  }
-
-  // Use client-side navigation instead of server-side redirect
+  // Поскольку в config.toml enable_confirmations=false,
+  // сессия сразу доступна
   return { success: true, redirectTo: returnUrl || '/dashboard' };
 }
 
-export async function forgotPassword(prevState: any, formData: FormData) {
+// Функция отправки письма для сброса пароля
+export async function forgotPassword(
+  _prevState: any,
+  formData: FormData
+) {
   const email = formData.get('email') as string;
   const origin = formData.get('origin') as string;
 
@@ -80,7 +77,6 @@ export async function forgotPassword(prevState: any, formData: FormData) {
   }
 
   const supabase = await createClient();
-
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${origin}/auth/reset-password`,
   });
@@ -95,23 +91,23 @@ export async function forgotPassword(prevState: any, formData: FormData) {
   };
 }
 
-export async function resetPassword(prevState: any, formData: FormData) {
+// Функция сброса пароля
+export async function resetPassword(
+  _prevState: any,
+  formData: FormData
+) {
   const password = formData.get('password') as string;
   const confirmPassword = formData.get('confirmPassword') as string;
 
   if (!password || password.length < 6) {
     return { message: 'Password must be at least 6 characters' };
   }
-
   if (password !== confirmPassword) {
     return { message: 'Passwords do not match' };
   }
 
   const supabase = await createClient();
-
-  const { error } = await supabase.auth.updateUser({
-    password,
-  });
+  const { error } = await supabase.auth.updateUser({ password });
 
   if (error) {
     return { message: error.message || 'Could not update password' };
@@ -123,6 +119,7 @@ export async function resetPassword(prevState: any, formData: FormData) {
   };
 }
 
+// Функция выхода из системы
 export async function signOut() {
   const supabase = await createClient();
   const { error } = await supabase.auth.signOut();
@@ -131,5 +128,6 @@ export async function signOut() {
     return { message: error.message || 'Could not sign out' };
   }
 
+  // Перенаправление после выхода
   return redirect('/');
 }
