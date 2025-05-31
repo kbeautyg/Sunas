@@ -1,4 +1,51 @@
+version: '3.8'
+
 services:
+  # -----------------------------
+  # 1) Сервис Postgres (Self-hosted Supabase DB)
+  # -----------------------------
+  postgres:
+    image: postgres:14-alpine
+    restart: always
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword   # замените на свой надёжный пароль
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # -----------------------------
+  # 2) Supabase Auth (GoTrue)
+  # -----------------------------
+  auth:
+    image: supabase/gotrue:latest
+    restart: always
+    env_file: 
+      - ./supabase/.env              # файл с ключами и настройками GoTrue
+    volumes:
+      - ./supabase/config.toml:/etc/gotrue/config.toml:ro
+    ports:
+      - "9999:9999"                   # прокидываем порт GoTrue (Auth)
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9999/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # -----------------------------
+  # 3) Redis (ваш сервис)
+  # -----------------------------
   redis:
     image: redis:7-alpine
     ports:
@@ -13,6 +60,9 @@ services:
       timeout: 5s
       retries: 3
 
+  # -----------------------------
+  # 4) RabbitMQ (ваш сервис)
+  # -----------------------------
   rabbitmq:
     image: rabbitmq
     ports:
@@ -28,6 +78,9 @@ services:
       retries: 5
       start_period: 10s
 
+  # -----------------------------
+  # 5) Ваш backend (Django/FastAPI/etc)
+  # -----------------------------
   backend:
     build:
       context: ./backend
@@ -45,6 +98,8 @@ services:
       - REDIS_SSL=False
       - RABBITMQ_HOST=rabbitmq
       - RABBITMQ_PORT=5672
+      - SUPABASE_URL=http://auth:9999         # URL Supabase Auth (GoTrue)
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY} # возьмите из supabase/.env
     depends_on:
       redis:
         condition: service_healthy
@@ -53,6 +108,9 @@ services:
       worker:
         condition: service_started
 
+  # -----------------------------
+  # 6) Ваш worker (Dramatiq и т. п.)
+  # -----------------------------
   worker:
     build:
       context: ./backend
@@ -69,12 +127,17 @@ services:
       - REDIS_SSL=False
       - RABBITMQ_HOST=rabbitmq
       - RABBITMQ_PORT=5672
+      - SUPABASE_URL=http://auth:9999
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
     depends_on:
       redis:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
 
+  # -----------------------------
+  # 7) Ваш frontend (Next.js)
+  # -----------------------------
   frontend:
     init: true
     build:
@@ -86,10 +149,13 @@ services:
       - ./frontend/.env.local:/app/.env.local:ro
     environment:
       - NODE_ENV=production
+      - NEXT_PUBLIC_SUPABASE_URL=http://auth:9999       # чтобы Next.js знал, куда обращаться
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
     command: ["npm", "run", "start"]
     depends_on:
       - backend
 
 volumes:
+  pgdata:
   redis_data:
   rabbitmq_data:
