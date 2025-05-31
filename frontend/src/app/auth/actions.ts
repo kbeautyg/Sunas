@@ -52,23 +52,13 @@ export async function signUp(prevState: any, formData: FormData) {
 
   const supabase = await createClient();
 
-  const { error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      emailRedirectTo: `${origin}/auth/callback?returnUrl=${returnUrl}`,
-    },
-  });
+const { error } = await supabase.auth.signUp({
 
   if (error) {
     return { message: error.message || 'Could not create account' };
   }
 
   // Try to sign in immediately
-  const { error: signInError } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
 
   if (signInError) {
     return {
