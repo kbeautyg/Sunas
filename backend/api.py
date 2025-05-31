@@ -13,6 +13,10 @@ from utils.logger import logger
 import uuid
 import time
 from collections import OrderedDict
+import os
+import uvicorn
+
+# ... остальной код api.py ...
 
 # Import the agent API module
 from agent import api as agent_api
@@ -146,16 +150,11 @@ async def health_check():
         "instance_id": instance_id
     }
 
+
 if __name__ == "__main__":
-    import uvicorn
-    
-    workers = 2
-    
-    logger.info(f"Starting server on 0.0.0.0:8000 with {workers} workers")
-    uvicorn.run(
-        "api:app", 
-        host="0.0.0.0", 
-        port=8000,
-        workers=workers,
-        # reload=True
-    )
+    # Считываем порт из переменной окружения PORT, используя 8000 как значение по умолчанию
+    port = int(os.environ.get("PORT", 8000))
+
+    # Запускаем uvicorn, используя хост "0.0.0.0" и считанный порт
+    # Хост "0.0.0.0" необходим для прослушивания на всех интерфейсах в контейнере Railway
+    uvicorn.run("api:app", host="0.0.0.0", port=port, workers=2)
